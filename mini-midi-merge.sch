@@ -15177,27 +15177,27 @@ SOIC-4:
 <part name="IC9" library="optocoupler" deviceset="6N138" device=""/>
 <part name="D2" library="jasons_stuff" deviceset="0805DIODE" device=""/>
 <part name="C6" library="rcl" deviceset="C-EU" device="C0805"/>
-<part name="R16" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R15" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R14" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R16" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
+<part name="R15" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
+<part name="R14" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
 <part name="IN3" library="jason_eagle6" deviceset="DIN5PIN" device=""/>
 <part name="IC8" library="optocoupler" deviceset="6N138" device=""/>
 <part name="D3" library="jasons_stuff" deviceset="0805DIODE" device=""/>
-<part name="R21" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R20" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R19" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R21" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
+<part name="R20" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
+<part name="R19" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
 <part name="IN2" library="jason_eagle6" deviceset="DIN5PIN" device=""/>
 <part name="IC7" library="optocoupler" deviceset="6N138" device=""/>
 <part name="D4" library="jasons_stuff" deviceset="0805DIODE" device=""/>
-<part name="R26" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R25" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R24" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R26" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
+<part name="R25" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
+<part name="R24" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
 <part name="IN1" library="jason_eagle6" deviceset="DIN5PIN" device=""/>
 <part name="IC10" library="optocoupler" deviceset="6N138" device=""/>
 <part name="D1" library="jasons_stuff" deviceset="0805DIODE" device=""/>
-<part name="R12" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R11" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R9" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R12" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
+<part name="R11" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
+<part name="R9" library="rcl" deviceset="R-EU_" device="R0805" value="1k5"/>
 <part name="IN" library="jason_eagle6" deviceset="DIN5PIN" device=""/>
 <part name="ICSP4" library="tag-connect" deviceset="TC2030" device="-MCP-NL"/>
 <part name="IC3" library="jasons_stuff" deviceset="PIC12F1822" device="SO08"/>
@@ -15208,13 +15208,13 @@ SOIC-4:
 <part name="ICSP2" library="tag-connect" deviceset="TC2030" device="-MCP-NL"/>
 <part name="ICSP1" library="tag-connect" deviceset="TC2030" device="-MCP-NL"/>
 <part name="X5" library="jason_eagle6" deviceset="DIN5PIN" device=""/>
-<part name="R1" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R2" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R1" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
+<part name="R2" library="rcl" deviceset="R-EU_" device="R0805" value="220"/>
 <part name="C2" library="rcl" deviceset="C-EU" device="C0805"/>
-<part name="R6" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R7" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R8" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R4" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R6" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
+<part name="R7" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
+<part name="R8" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
+<part name="R4" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L4" library="led" deviceset="LED" device="3MM"/>
 <part name="L6" library="led" deviceset="LED" device="3MM"/>
 <part name="IC5" library="burr-brown" deviceset="REG1117" device=""/>
@@ -15223,20 +15223,20 @@ SOIC-4:
 <part name="C8" library="rcl" deviceset="CPOL-EU" device="E2,5-6E"/>
 <part name="C7" library="rcl" deviceset="CPOL-EU" device="E2,5-6E"/>
 <part name="IC11" library="microbuilder" deviceset="BRIDGERECTIFIER" device=""/>
-<part name="R3" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R3" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L7" library="led" deviceset="LED" device="3MM"/>
-<part name="R22" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R17" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R10" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R23" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R22" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
+<part name="R17" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
+<part name="R10" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
+<part name="R23" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L1" library="led" deviceset="LED" device="3MM"/>
-<part name="R18" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R18" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L2" library="led" deviceset="LED" device="3MM"/>
-<part name="R13" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R13" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L3" library="led" deviceset="LED" device="3MM"/>
 <part name="U$9" library="jason_eagle6" deviceset="PWR_SOCKET_2_1MM" device=""/>
 <part name="S1" library="switch-omron" deviceset="10-XX" device=""/>
-<part name="R5" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R5" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="L5" library="led" deviceset="LED" device="3MM"/>
 </parts>
 <sheets>
@@ -15250,26 +15250,50 @@ SOIC-4:
 <instance part="D2" gate="G$1" x="5.08" y="129.54"/>
 <instance part="C6" gate="G$1" x="157.48" y="200.66" rot="R90"/>
 <instance part="R16" gate="G$1" x="-2.54" y="132.08"/>
-<instance part="R15" gate="G$1" x="43.18" y="129.54"/>
-<instance part="R14" gate="G$1" x="43.18" y="127"/>
+<instance part="R15" gate="G$1" x="43.18" y="129.54" smashed="yes">
+<attribute name="NAME" x="41.91" y="131.0386" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="128.778" size="1.778" layer="96"/>
+</instance>
+<instance part="R14" gate="G$1" x="43.18" y="127" smashed="yes">
+<attribute name="NAME" x="41.91" y="123.4186" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="126.238" size="1.778" layer="96"/>
+</instance>
 <instance part="IN3" gate="G$1" x="-22.86" y="134.62"/>
 <instance part="IC8" gate="G$1" x="20.32" y="154.94"/>
 <instance part="D3" gate="G$1" x="5.08" y="157.48"/>
 <instance part="R21" gate="G$1" x="-2.54" y="160.02"/>
-<instance part="R20" gate="G$1" x="43.18" y="157.48"/>
-<instance part="R19" gate="G$1" x="43.18" y="154.94"/>
+<instance part="R20" gate="G$1" x="43.18" y="157.48" smashed="yes">
+<attribute name="NAME" x="41.91" y="158.9786" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="156.718" size="1.778" layer="96"/>
+</instance>
+<instance part="R19" gate="G$1" x="43.18" y="154.94" smashed="yes">
+<attribute name="NAME" x="41.91" y="151.3586" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="154.178" size="1.778" layer="96"/>
+</instance>
 <instance part="IN2" gate="G$1" x="-22.86" y="162.56"/>
 <instance part="IC7" gate="G$1" x="20.32" y="180.34"/>
 <instance part="D4" gate="G$1" x="5.08" y="182.88"/>
 <instance part="R26" gate="G$1" x="-2.54" y="185.42"/>
-<instance part="R25" gate="G$1" x="43.18" y="182.88"/>
-<instance part="R24" gate="G$1" x="43.18" y="180.34"/>
+<instance part="R25" gate="G$1" x="43.18" y="182.88" smashed="yes">
+<attribute name="NAME" x="39.37" y="184.3786" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="182.118" size="1.778" layer="96"/>
+</instance>
+<instance part="R24" gate="G$1" x="43.18" y="180.34" smashed="yes">
+<attribute name="NAME" x="39.37" y="176.7586" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="179.578" size="1.778" layer="96"/>
+</instance>
 <instance part="IN1" gate="G$1" x="-22.86" y="187.96"/>
 <instance part="IC10" gate="G$1" x="20.32" y="96.52"/>
 <instance part="D1" gate="G$1" x="5.08" y="99.06"/>
 <instance part="R12" gate="G$1" x="-2.54" y="101.6"/>
-<instance part="R11" gate="G$1" x="43.18" y="99.06"/>
-<instance part="R9" gate="G$1" x="43.18" y="96.52"/>
+<instance part="R11" gate="G$1" x="43.18" y="99.06" smashed="yes">
+<attribute name="NAME" x="41.91" y="100.5586" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="98.298" size="1.778" layer="96"/>
+</instance>
+<instance part="R9" gate="G$1" x="43.18" y="96.52" smashed="yes">
+<attribute name="NAME" x="41.91" y="92.9386" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.91" y="95.758" size="1.778" layer="96"/>
+</instance>
 <instance part="IN" gate="G$1" x="-22.86" y="104.14"/>
 <instance part="ICSP4" gate="G$1" x="223.52" y="193.04"/>
 <instance part="IC3" gate="G$1" x="160.02" y="162.56"/>
@@ -15281,10 +15305,19 @@ SOIC-4:
 <instance part="ICSP1" gate="G$1" x="223.52" y="71.12"/>
 <instance part="X5" gate="G$1" x="-22.86" y="73.66"/>
 <instance part="R1" gate="G$1" x="-48.26" y="71.12"/>
-<instance part="R2" gate="G$1" x="2.54" y="71.12"/>
+<instance part="R2" gate="G$1" x="2.54" y="71.12" smashed="yes">
+<attribute name="NAME" x="-1.27" y="72.6186" size="1.778" layer="95"/>
+<attribute name="VALUE" x="3.81" y="72.898" size="1.778" layer="96"/>
+</instance>
 <instance part="C2" gate="G$1" x="160.02" y="78.74" rot="R90"/>
-<instance part="R6" gate="G$1" x="203.2" y="116.84"/>
-<instance part="R7" gate="G$1" x="203.2" y="114.3"/>
+<instance part="R6" gate="G$1" x="203.2" y="116.84" smashed="yes">
+<attribute name="NAME" x="199.39" y="120.8786" size="1.778" layer="95"/>
+<attribute name="VALUE" x="199.39" y="118.618" size="1.778" layer="96"/>
+</instance>
+<instance part="R7" gate="G$1" x="203.2" y="114.3" smashed="yes">
+<attribute name="NAME" x="199.39" y="110.7186" size="1.778" layer="95"/>
+<attribute name="VALUE" x="199.39" y="108.458" size="1.778" layer="96"/>
+</instance>
 <instance part="R8" gate="G$1" x="198.12" y="48.26" rot="R90"/>
 <instance part="R4" gate="G$1" x="203.2" y="48.26" rot="R90"/>
 <instance part="L4" gate="G$1" x="198.12" y="35.56"/>
