@@ -1,3 +1,6 @@
+*.tmp
+*.jbf
+
 # EAGLE
 
 *.b#1
@@ -9,7 +12,6 @@
 *.b#7
 *.b#8
 *.b#9
-*.b##
 *.s#1
 *.s#2
 *.s#3
@@ -19,7 +21,6 @@
 *.s#7
 *.s#8
 *.s#9
-*.s##
 
 # GERBER
 
@@ -33,14 +34,8 @@
 *.GTP
 *.GTS
 *.TXT
-*.gm1
-*.gbp
-*.zip
 
 
-
-*.jbf
-backup_of_*.cdr
 
 ############
 ## Windows
@@ -53,3 +48,17 @@ Thumbs.db
 Desktop.ini
 
 
+##############
+## Sourceboost
+##############
+*.asm
+*.brws
+*.casm
+*.cof
+*.lst
+*.map
+*.obj
+*.stat
+*.tree
+makefile.*
+MIDI-Hub.hex

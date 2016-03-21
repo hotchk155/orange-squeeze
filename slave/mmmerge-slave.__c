@@ -1,0 +1,9 @@
+[Settings]
+Active Directory=D:\GitHub\mini-MIDI-merge\slave\
+Target=PIC12F1822
+Active Compiler=BoostC
+Active Config=Debug
+Config=1
+[Files]
+Count=1
+File0=mmmerge-slave.c
