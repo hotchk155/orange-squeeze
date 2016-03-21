@@ -99,10 +99,10 @@ void interrupt( void )
 						// place special identity string in the data buffer
 						data_buf_tail = 0;
 						data_buf_count = 0;
-						data_buf[data_buf_count++] = HANDSHAKE_0;
-						data_buf[data_buf_count++] = HANDSHAKE_1;
-						data_buf[data_buf_count++] = HANDSHAKE_2;
-						data_buf[data_buf_count++] = HANDSHAKE_3;
+						data_buf[data_buf_count++] = 'M';
+						data_buf[data_buf_count++] = 'S';;
+						data_buf[data_buf_count++] = 'L';;
+						data_buf[data_buf_count++] = 'V';;
 						data_buf[data_buf_count++] = 'A' + slave_id;
 						data_buf_head = data_buf_count;					
 						ssp1buf = FIRMWARE_VERSION; // send firmware version
