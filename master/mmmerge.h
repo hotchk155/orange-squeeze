@@ -7,8 +7,8 @@
 ////////////////////////////////////////////////////////////
 #define I2C_ADDR 			0x70	// slave address #0
 
-#define DATA_BUFFER_SIZE 	64		// Size of a client message buffer
-#define UNDERFLOW_DATA		0xFF	// what will be sent in event of underflow
+#define UNDERFLOW_DATA		0xF9	// what will be sent in event of underflow
+#define OVERFLOW_BIT		0x80	
 
 #define STATUS_UNDERFLOW 	0x01	// master tried to read empty slave buffer
 #define STATUS_BADCOMMAND 	0x02	// master sent a command slave did not recognise

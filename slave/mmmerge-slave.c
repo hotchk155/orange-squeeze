@@ -35,6 +35,8 @@ typedef unsigned char byte;
 // PORTA I/O tristate mask
 #define TRIS_A 			0b00100110
 
+#define FLAG_OVERFLOW			0x01
+
 // Define special LED override modes
 #define LED_OVERRIDE_SIGNAL		1	// the LED will blink once then return to normal mode
 #define LED_OVERRIDE_BLINK		2	// the LED will blink repeatedly
@@ -61,10 +63,12 @@ volatile byte slave_command = 0;
 volatile byte slave_flags = 0;
 
 // The MIDI data buffer
-volatile byte data_buf[DATA_BUFFER_SIZE];
-volatile byte data_buf_head = 0;
-volatile byte data_buf_tail = 0;
-volatile byte data_buf_count = 0;
+#define SZ_RXBUFFER	64
+#define MASK_RXBUFFER_INDEX	0x3F
+volatile byte rx_buffer[SZ_RXBUFFER];
+volatile byte rx_head = 0;
+volatile byte rx_tail = 0;
+volatile byte rx_count = 0;
 
 // number of milliseconds till LED state changes (for blinking etc)
 volatile int led_timeout = 0;
@@ -97,18 +101,24 @@ void interrupt( void )
 						break;
 					case CMD_IDENTIFY:
 						// place special identity string in the data buffer
-						data_buf_tail = 0;
-						data_buf_count = 0;
-						data_buf[data_buf_count++] = 'M';
-						data_buf[data_buf_count++] = 'S';;
-						data_buf[data_buf_count++] = 'L';;
-						data_buf[data_buf_count++] = 'V';;
-						data_buf[data_buf_count++] = 'A' + slave_id;
-						data_buf_head = data_buf_count;					
+						rx_tail = 0;
+						rx_count = 0;
+						rx_buffer[rx_count++] = 'M';
+						rx_buffer[rx_count++] = 'S';;
+						rx_buffer[rx_count++] = 'L';;
+						rx_buffer[rx_count++] = 'V';;
+						rx_buffer[rx_count++] = 'A' + slave_id;
+						rx_head = rx_count;					
 						ssp1buf = FIRMWARE_VERSION; // send firmware version
 						break;
 					default:
-						ssp1buf = data_buf_count; // send the number of bytes available
+						d = rx_count;
+						if(slave_flags & FLAG_OVERFLOW)
+						{
+							slave_flags &= ~FLAG_OVERFLOW;
+							d |= OVERFLOW_BIT;
+						}
+						ssp1buf = d; // send the number of bytes available
 						break;
 				}
 				slave_command = 0;
@@ -135,9 +145,9 @@ void interrupt( void )
 						slave_status &= ~STATUS_RECEIVING;
 						// Fall through to clear
 					case CMD_CLEAR:
-						data_buf_head = 0;
-						data_buf_tail = 0;
-						data_buf_count = 0;
+						rx_head = 0;
+						rx_tail = 0;
+						rx_count = 0;
 						break;						
 					// SLAVE LED SET TO NORMAL MODE (show MIDI activity)
 					case CMD_LEDACTIVITY:
@@ -161,7 +171,7 @@ void interrupt( void )
 			else // MASTER IS READING FROM SLAVE
 			{ 						
 				ssp1con1.7 = 0; // clear write collision bit
-				if(data_buf_count <= 0) 
+				if(rx_count <= 0) 
 				{
 					// data underflow
 					ssp1buf = UNDERFLOW_DATA;	
@@ -169,13 +179,10 @@ void interrupt( void )
 				}
 				else 
 				{
-					// send the next
-					ssp1buf = data_buf[data_buf_tail];	
-					if(++data_buf_tail >= DATA_BUFFER_SIZE) 
-					{
-						data_buf_tail = 0;
-					}
-					--data_buf_count;
+					// send the next byte
+					ssp1buf = rx_buffer[rx_tail];	
+					rx_tail = (rx_tail+1)&MASK_RXBUFFER_INDEX;
+					--rx_count;
 				}
 			}
 		}
@@ -192,12 +199,10 @@ void interrupt( void )
 		d = rcreg;
 		
 		// calculate the next buffer position
-		byte next_head = data_buf_head + 1;
-		if(next_head >= DATA_BUFFER_SIZE) {
-			next_head = 0;
-		}
-		if(next_head == data_buf_tail) {
+		byte next_head = (rx_head+1)&MASK_RXBUFFER_INDEX;
+		if(next_head == rx_tail) {
 			// the buffer is full! byte will be lost
+			slave_flags |= FLAG_OVERFLOW;
 			slave_status |= STATUS_OVERFLOW;
 			
 			// signal overflow
@@ -208,8 +213,9 @@ void interrupt( void )
 		}
 		else {
 			// put the byte in the buffer
-			data_buf[data_buf_head] = d;
-			data_buf_head = next_head;
+			rx_buffer[rx_head] = d;
+			rx_head = next_head;
+			++rx_count;
 			
 			// signal activity
 			if(!led_override) {
@@ -239,7 +245,7 @@ void interrupt( void )
 ////////////////////////////////////////////////////////////
 void uart_init()
 {
-	pir1.1 = 1;		//TXIF 		
+	pir1.1 = 0;		//TXIF 		
 	pir1.5 = 0;		//RCIF
 	
 	pie1.1 = 0;		//TXIE 		no interrupts
@@ -251,13 +257,14 @@ void uart_init()
 	baudcon.0 = 0;	// ABDEN	auto baud detect
 		
 	txsta.6 = 0;	// TX9		8 bit transmission
-	txsta.5 = 1;	// TXEN		transmit enable
+	txsta.5 = 0;	// TXEN		transmit enable
 	txsta.4 = 0;	// SYNC		async mode
 	txsta.3 = 0;	// SEDNB	break character
 	txsta.2 = 0;	// BRGH		high baudrate 
 	txsta.0 = 0;	// TX9D		bit 9
 
-	rcsta.7 = 0;	// SPEN 	serial port initially disabled
+	rcsta.7 = 1;	// SPEN 	
+	//rcsta.7 = 0;	// SPEN 	serial port initially disabled
 	rcsta.6 = 0;	// RX9 		8 bit operation
 	rcsta.5 = 1;	// SREN 	enable receiver
 	rcsta.4 = 1;	// CREN 	continuous receive enable
