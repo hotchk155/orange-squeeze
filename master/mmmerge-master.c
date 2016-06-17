@@ -4,6 +4,7 @@
 #include <system.h>
 #include <rand.h>
 #include <eeprom.h>
+#include <memory.h>
 #include "mmmerge.h"
 
 // PIC CONFIG BITS
@@ -507,14 +508,14 @@ void slave_run(byte addr, INPUT_STATUS *pstatus)
 	byte count = i2c_begin_read(addr);	
 	
 	// mask out slave overflow bit
-	if(count & OVERFLOW_BIT) 
-	{
-		count &= ~OVERFLOW_BIT;
+//	if(count & OVERFLOW_BIT) 
+//	{
+//		count &= ~OVERFLOW_BIT;
 //		SIGNAL_LED3(MIDI_OVERFLOW);
-	}
+//	}
 
-	if(!count) 
-		SIGNAL_LED3(MIDI_OVERFLOW);
+//	if(!count) 
+//		SIGNAL_LED3(MIDI_OVERFLOW);
 
 	// get all data from slave
 	byte buffer[64];
@@ -525,6 +526,8 @@ void slave_run(byte addr, INPUT_STATUS *pstatus)
 	for(i=0; i<count; ++i)  
 	{
 		byte d = buffer[i];
+
+		//transmit(d);
 		
 		// No system common or real time messages 
 		// will be processed from a slave. This means
@@ -550,7 +553,12 @@ void slave_run(byte addr, INPUT_STATUS *pstatus)
 		}
 	}
 }	
-	
+
+void init_status(INPUT_STATUS *pstatus)
+{
+	memset(pstatus,0,sizeof(pstatus));
+}	
+
 ////////////////////////////////////////////////////////////
 //
 // MAIN
@@ -575,9 +583,9 @@ void main()
 	wpua.5 = 1; // weak pullup on switch RA5
 	option_reg.7 = 0;	// enable weak pull ups on port a
 
-	// enable interrupts	
-	intcon.7 = 1; //GIE
-	intcon.6 = 1; //PEIE
+	init_status(&master_status);
+	for(i=0; i<NUM_SLAVES; ++i) 
+		init_status(&slave_status[i]);
 
 	// initialise timer
 	init_timer();
@@ -595,26 +603,10 @@ void main()
 	// this delay makes sure all the slaves have time to initialise
 	delay_ms(100);
 
-	// Now check which slaves are present
-	for(i=0; i<NUM_SLAVES; ++i) 
-	{
-		// try a data handshake with the slave
-		slave_addr = SLAVE_I2C_ADDR | i;
-		if(slave_handshake(slave_addr)) 
-		{
-			// slave is online, get it ready to go
-			slave_command(slave_addr, CMD_LEDSIGNAL);
-			slave_command(slave_addr, CMD_CLEAR);
-			slave_command(slave_addr, CMD_ENABLE);
-			slave_status[i].flags |= IS_ONLINE;
-		}
-		else
-		{
-			// slave did not respond. in case it is listening
-			// get it to blink in error
-			slave_command(SLAVE_I2C_ADDR|i, CMD_LEDBLINK);
-		}
-	}
+	// enable interrupts	
+	intcon.7 = 1; //GIE
+	intcon.6 = 1; //PEIE
+
 	
 	while(1) 
 	{
@@ -627,18 +619,17 @@ void main()
 		}
 
 		// poll the master
-		master_run();
+		//master_run();
 
 		// master sysex transmission blocks slaves
-		if(!(master_status.flags & INSIDE_SYSEX)) 
+		//if(!(master_status.flags & INSIDE_SYSEX)) 
 		{
 			// round-robin the slaves
-			//for(i=0; i<NUM_SLAVES; ++i) 
-			for(i=0; i<2; ++i) 
+			for(i=0; i<NUM_SLAVES; ++i) 
+//			for(i=0; i<1; ++i) 
 			{			
-				if(slave_status[i].flags & IS_ONLINE)
+//				if(slave_status[i].flags & IS_ONLINE)
 					slave_run(SLAVE_I2C_ADDR|i, &slave_status[i]);
-delay_ms(10);
 			}
 		}
 		// ensure any buffered realtime messages are flushed 

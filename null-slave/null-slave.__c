@@ -1,0 +1,12 @@
+[Settings]
+Active Directory=D:\GitHub\mini-MIDI-merge\null-slave\
+Target=PIC12LF1822
+Active Compiler=BoostC
+Active Config=Debug
+Last Ext=c
+[Files]
+Count=1
+File0=null_slave.c
+[Browser]
+UseSysHeaders=1
+UseNovoHeaders=1
