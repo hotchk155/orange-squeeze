@@ -4,6 +4,8 @@ Target=PIC12F1822
 Active Compiler=BoostC
 Active Config=Debug
 Config=1
+Last Ext=h
 [Files]
-Count=1
-File0=mmmerge-slave.c
+Count=2
+File0=..\master\mmmerge.h
+File1=mmmerge-slave.c

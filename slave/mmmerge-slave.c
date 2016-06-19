@@ -1,29 +1,50 @@
 ////////////////////////////////////////////////////////////
 //
-// MIDI MERGE MODULE
+//           ///    //// /////  /////   /////   ////
+//         //  // //        // //  // //   // //  //
+//        //  // //     ///// //  //  ////// //////
+//       //  // //    //  // //  //      // //
+//        ////  //     ///// //  //   /////  /////   
 //
-// MIDI INPUT SLAVE CONTROLLER FIRMWARE
+//      ////  ///// //  //  ////   //// //////   //// 
+//    //    //  // //  // //  // //  //    //  //  //
+//    ////  ///// //  // ////// //////   //   //////
+//      //    // //  // //     //      //    //
+//  ////     /// /////  /////  ////  //////  /////
 //
-// Code for PIC12F1822
-// Compiled with SourceBoost C
+// 4:1 MIDI MERGE - MIDI TO I2C SLAVE MODULE
+// 2016/hotchk155         Sixty Four Pixels Limited
+// 
+// This code licensed under terms of creative commons BY-NC-SA
+// http://creativecommons.org/licenses/by-nc-sa/4.0/
 //
-// 2016/hotchk155
+// Code for PIC12F1822, Compiled with SourceBoost C
 //
 // History
-// Ver  Date 	Desc
+// Ver  Date 		Desc	
+// 1    18/6/16		Initial version
 //
 #define FIRMWARE_VERSION 	1
 ////////////////////////////////////////////////////////////
 
+//
+// INCLUDE FILES
+//
 #include <system.h>
 #include "..\master\mmmerge.h"
+
+//
+// PIC12F1822 MCU CONFIG
+//
 
 // 16MHz internal oscillator block, reset disabled
 #pragma DATA _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _MCLRE_OFF &_CLKOUTEN_OFF
 #pragma DATA _CONFIG2, _WRT_OFF & _PLLEN_OFF & _STVREN_ON & _BORV_19 & _LVP_OFF
 #pragma CLOCK_FREQ 16000000
 
-typedef unsigned char byte;
+//
+// CONSTANTS
+//
 
 // define the I/O pins. Note that 
 // PORTA.5 is the UART RX pin
@@ -34,41 +55,55 @@ typedef unsigned char byte;
 // PORTA I/O tristate mask
 #define TRIS_A 			0b00100110
 
-
 // Define time periods (milliseconds)
 #define LED_ACTIVITY_PERIOD		2		
-#define LED_ERROR_PERIOD 		1000	
+#define LED_ERROR_PERIOD 		200
 #define LED_SIGNAL_PERIOD 		200
 
 // Timer settings
 #define TIMER_0_INIT_SCALAR		5	// Timer 0 is an 8 bit timer counting at 250kHz
 
+//
+// TYPE DEFS
+//
 
-// ID of the slave 
-volatile byte slave_id;
+typedef unsigned char byte;
 
-// slave status
-//volatile byte note = 1;
-//volatile byte ms = 0;
-
-volatile int led_timeout;
-
-// The MIDI data buffer
-#define SZ_DATABUFFER 50
-
+// Structure to hold a data buffer (for receiving serial MIDI
+// and for sending it out to the master over I2C bus)
 typedef struct {
-	byte count;
-	byte data[SZ_DATABUFFER];	
+	byte count;					// number of bytes in the buffer
+	byte data[SZ_SLAVEDATA];	// data bytes
+	byte error;					// error flag
 } DATA_BUFFER;
 
+//
+// GLOBAL DATA
+//
+
+// Data buffers
 // One buffer is receiving MIDI data
 // while the other transmitting to I2C
 volatile DATA_BUFFER Buffer1;
 volatile DATA_BUFFER Buffer2;
 
-volatile DATA_BUFFER *rx_buf;
+// pointer to the current buffer for storing received MIDI bytes
+volatile DATA_BUFFER *rx_buf;	
+
+// pointer to the current buffer for sending data to master
 volatile DATA_BUFFER *tx_buf;
+
+// index into the transmit buffer data
 volatile byte tx_index;
+
+// ID of the slave 
+volatile byte slave_id;
+
+// used to time LED flashes
+volatile int led_timeout;
+
+// The master might send us a command byte
+volatile byte master_command;
 
 ////////////////////////////////////////////////////////////
 //
@@ -77,48 +112,75 @@ volatile byte tx_index;
 ////////////////////////////////////////////////////////////
 void interrupt( void )
 {
-	byte d;
-
 	//////////////////////////////////////////////////////////
 	// I2C SLAVE INTERRUPT
 	// Called when there is activity on the I2C bus
 	if(pir1.3) 
 	{	
 		pir1.3 = 0; // clear interrupt flag
-		if(!ssp1stat.D_NOT_A) // ADDRESS
+		if(!ssp1stat.D_NOT_A) // master has sent our slave address
 		{
-			d = ssp1buf; // read and discard address to clear BF
+			byte d = ssp1buf; // read and discard address to clear BF flag
 		
-			if(ssp1stat.R_NOT_W) // MASTER IS READING FROM SLAVE
+			// Is the master setting up a data READ?
+			if(ssp1stat.R_NOT_W) 
 			{ 		
-				// switch the buffers
+				// switch the buffers, so that the current receive buffer 
+				// data is ready to send to the master
 				DATA_BUFFER *temp_buf = rx_buf;
 				rx_buf = tx_buf;
 				tx_buf = temp_buf;
-				
-				// clear the receive buffer ready for new data
-				rx_buf->count = 0;
-				
-				// send the count of characters to master
-				ssp1buf = tx_buf->count;
 				tx_index = 0;
+				
+				// clear the receive buffer ready for new MIDI data
+				rx_buf->count = 0;
+				rx_buf->error = 0;
+				
+				// now return the byte count to the master - this 
+				// precedes the data byte. Set the top bit of the
+				// count field if any error has occurred
+				byte count = tx_buf->count;
+				if(tx_buf->error) {
+					count |= 0x80;
+				}
+				ssp1buf = count;
+			}
+			else 
+			{
+				// dummy data
+				ssp1buf = 0;
 			}
 		}
 		else // DATA 
 		{ 
 			if(!ssp1stat.R_NOT_W) // MASTER IS WRITING TO SLAVE
 			{
-				d = ssp1buf; // read byte
+				// Commands that the master might send
+				switch(ssp1buf) {
+					case CMD_START:	// Reset buffers and start receiving MIDI				
+						rx_buf->count = 0;
+						tx_buf->count = 0;
+						tx_index = 0;						
+						rcsta.7 = 1;
+						P_LED = 1;
+						led_timeout = LED_SIGNAL_PERIOD;
+						break;
+					case CMD_STOP:	// Stop receiving MIDI
+						rcsta.7 = 0;
+						break;
+				}
 			}
 			else // MASTER IS READING FROM SLAVE
 			{ 						
 				ssp1con1.WCOL = 0; // clear write collision bit
 				if(tx_index < tx_buf->count) 
 				{
+					// return the next data byte
 					ssp1buf = tx_buf->data[tx_index++];
 				}
 				else {
-					ssp1buf=0x00; // buffer underflow should not happen!
+					// buffer underflow.. should not happen!
+					ssp1buf=0; 
 				}
 			}
 		}
@@ -130,7 +192,7 @@ void interrupt( void )
 	if(pir1.5)
 	{
 		// place the received MIDI byte in the receive buffer;
-		if(rx_buf->count < SZ_DATABUFFER - 1) {
+		if(rx_buf->count < SZ_SLAVEDATA - 1) {
 			rx_buf->data[rx_buf->count++] = rcreg;
 			P_LED = 1;
 			if(led_timeout < LED_ACTIVITY_PERIOD) {
@@ -139,7 +201,9 @@ void interrupt( void )
 
 		}
 		else {
+			// buffer overflow
 			P_LED = 1;
+			rx_buf->error = 1;
 			led_timeout = LED_ERROR_PERIOD;
 		}
 		pir1.5 = 0;
@@ -186,8 +250,7 @@ void uart_init()
 	txsta.2 = 0;	// BRGH		high baudrate 
 	txsta.0 = 0;	// TX9D		bit 9
 
-	rcsta.7 = 1;	// SPEN 	
-	//rcsta.7 = 0;	// SPEN 	serial port initially disabled
+	rcsta.7 = 0;	// SPEN 	serial port initially disabled
 	rcsta.6 = 0;	// RX9 		8 bit operation
 	rcsta.5 = 1;	// SREN 	enable receiver
 	rcsta.4 = 1;	// CREN 	continuous receive enable
@@ -279,16 +342,14 @@ void main()
 	rx_buf = &Buffer1;
 	tx_buf = &Buffer2;
 	tx_index = 0;
-
+	master_command = 0;
+	
 	// configure io
 	trisa = TRIS_A;              	
 	ansela = 0b00000000;
 	porta=0;
 	apfcon.7=1; // RX on RA5
 	apfcon.2=1;	// TX on RA4
-
-	P_LED = 1;
-	led_timeout = LED_SIGNAL_PERIOD;
 
 	// Get the id of this chip
 	slave_id = get_slave_id();
@@ -311,6 +372,7 @@ void main()
 	// by interrupts
 	for(;;)
 	{	
+		// clear receive buffer overruns
 		if(rcsta.1)
 		{
 			rcsta.4 = 0;
@@ -318,3 +380,7 @@ void main()
 		}
 	}
 }
+
+//
+// END
+// 

@@ -1,13 +1,43 @@
+////////////////////////////////////////////////////////////
+//
+//           ///    //// /////  /////   /////   ////
+//         //  // //        // //  // //   // //  //
+//        //  // //     ///// //  //  ////// //////
+//       //  // //    //  // //  //      // //
+//        ////  //     ///// //  //   /////  /////   
+//
+//      ////  ///// //  //  ////   //// //////   //// 
+//    //    //  // //  // //  // //  //    //  //  //
+//    ////  ///// //  // ////// //////   //   //////
+//      //    // //  // //     //      //    //
+//  ////     /// /////  /////  ////  //////  /////
+//
+// 4:1 MIDI MERGE - MIDI TO I2C MASTER MODULE
+// 2016/hotchk155         Sixty Four Pixels Limited
+// 
+// This code licensed under terms of creative commons BY-NC-SA
+// http://creativecommons.org/licenses/by-nc-sa/4.0/
+//
+// Code for PIC12F1822, Compiled with SourceBoost C
+//
+// History
+// Ver  Date 		Desc	
+// 1    18/6/16		Initial version
+//
+#define FIRMWARE_VERSION 	1
+////////////////////////////////////////////////////////////
+
 //
 // HEADER FILES
 //
 #include <system.h>
-#include <rand.h>
-#include <eeprom.h>
 #include <memory.h>
 #include "mmmerge.h"
 
-// PIC CONFIG BITS
+// 
+// PIC12F1822 CONFIG BYTES
+//
+
 // - RESET INPUT DISABLED
 // - WATCHDOG TIMER OFF
 // - INTERNAL OSC
@@ -15,16 +45,17 @@
 #pragma DATA _CONFIG2, _WRT_OFF & _PLLEN_OFF & _STVREN_ON & _BORV_19 & _LVP_OFF
 #pragma CLOCK_FREQ 16000000
 
-typedef unsigned char byte;
+//
+// CONSTANTS
+//
 
-//
-// INPUT/OUTPUT DEFS
-//
-#define P_LED1		latc.2 // MIDI input red LED
-#define P_LED2		latc.3 // Blue LED
-#define P_LED3		lata.2 // Yellow LED
+// io pins
+#define P_LED1		latc.2 	// MIDI input red LED
+#define P_LED2		latc.3 	// Blue LED
+#define P_LED3		lata.2 	// Yellow LED
 #define P_SWITCH	porta.5
 
+// io direction bits
 #define TRIS_A	0b00100000
 #define TRIS_C	0b00110000
 
@@ -33,53 +64,60 @@ typedef unsigned char byte;
 
 #define TIMER_0_INIT_SCALAR		5	// Timer 0 is an 8 bit timer counting at 250kHz
 
-#define SZ_TXBUFFER 16
-#define TXBUFFER_INDEX_MASK 0x0F
-volatile byte tx_buffer[SZ_TXBUFFER];
-volatile byte tx_head = 0;
-volatile byte tx_tail = 0;
+#define SYSEX_TIMEOUT 1000	// Timeout (ms) to prevent an unfinished sysex from blocking system
 
 #define SZ_RXBUFFER 64
 #define RXBUFFER_INDEX_MASK 0x3F
-volatile byte rx_buffer[SZ_RXBUFFER];
-volatile byte rx_head = 0;
-volatile byte rx_tail = 0;
 
-
-volatile byte led_1_timeout = 0;
-volatile byte led_2_timeout = 0;
-volatile byte led_3_timeout = 0;
+#define SZ_TXBUFFER 64
+#define TXBUFFER_INDEX_MASK 0x3F
 
 #define INITIAL_PULSE				200
-#define MIDI_INPUT_PULSE			5
-#define MIDI_OVERFLOW				100
-#define MIDI_OUTPUT_PULSE			5
+#define MIDI_INPUT_PULSE			1
+#define MIDI_INPUT_OVERFLOW			200
+#define MIDI_OUTPUT_PULSE			1
 
 // macros used to signal the 3 LEDs
-#define SIGNAL_LED1(t) { P_LED1 = 1; led_1_timeout = (t); }
-#define SIGNAL_LED2(t) { P_LED2 = 1; led_2_timeout = (t); }
-#define SIGNAL_LED3(t) { P_LED3 = 1; led_3_timeout = (t); }
+#define LED_1_SIGNAL(t) { P_LED1 = 1; if(t>led_1_timeout) led_1_timeout = t; }
+#define LED_2_SIGNAL(t) { P_LED2 = 1; if(t>led_2_timeout) led_2_timeout = t; }
+#define LED_3_SIGNAL(t) { P_LED3 = 1; if(t>led_3_timeout) led_3_timeout = t; }
 
-// Definitions for the flags byte in input status
-#define IS_ONLINE 		0x01	// Slave responded to initial handshake
-#define INSIDE_SYSEX   	0x02	// Slave is passing sysex
+
+#define SZ_DATACHUNK 64			// How many bytes to process on each pass 
+
+#define NUM_SLAVES 3
+
+//
+// TYPE DEFINITIONS
+//
+typedef unsigned char byte;
 
 typedef struct 
 {
-	byte flags;
-	byte sysex_timeout;	
-	
+	byte enabled;				// TRUE if this slave exists
 	byte running_status;		// MIDI running status for this slave
+	byte is_system_common_msg;	// TRUE if this is not really running status but is system common msg
 	byte param[2];				// MIDI parameters
 	byte num_params;			// Number of parameters
-	byte param_index;			// Current parameter (0..1)
+	byte param_index;			// Current parameter (0..1)	
 } INPUT_STATUS;
 
-#define NUM_SLAVES 3
-INPUT_STATUS slave_status[NUM_SLAVES] = {0};
-INPUT_STATUS master_status = {0};
-byte out_running_status = 0;
-
+//
+// GLOBAL DATA
+//
+volatile byte rx_buffer[SZ_RXBUFFER];
+volatile byte rx_head = 0;
+volatile byte rx_tail = 0;
+volatile byte tx_buffer[SZ_TXBUFFER];
+volatile byte tx_head = 0;
+volatile byte tx_tail = 0;
+volatile int sysex_timer = 0;
+volatile INPUT_STATUS slave_status[NUM_SLAVES];
+volatile INPUT_STATUS master_status;
+volatile byte out_running_status;
+volatile int led_1_timeout;
+volatile int led_2_timeout;
+volatile int led_3_timeout;
 
 ////////////////////////////////////////////////////////
 //
@@ -88,7 +126,31 @@ byte out_running_status = 0;
 ////////////////////////////////////////////////////////
 void interrupt( void )
 {
-	byte next_head;
+	char next;	
+
+	////////////////////////////////////////////////
+	// SERIAL PORT RECEIVE INTERRUPT
+	// Fires when traffic arrives at the primary 
+	// MIDI port
+	if(pir1.5)
+	{			
+		// read the value to clear rc status
+		byte b = rcreg;		
+		pir1.5 = 0;
+		
+		next = rx_head + 1;
+		next &= RXBUFFER_INDEX_MASK;
+		if(next == rx_tail) {
+			// full receive buffer! data will be dropped
+			LED_1_SIGNAL(MIDI_INPUT_OVERFLOW);
+			LED_3_SIGNAL(MIDI_INPUT_OVERFLOW);
+		}
+		else {
+			rx_buffer[rx_head] = b;
+			rx_head = next;
+			LED_1_SIGNAL(MIDI_INPUT_PULSE);
+		}			
+	}		
 	
 	////////////////////////////////////////////////
 	// TIMER0 OVERFLOW INTERRUPT
@@ -109,50 +171,32 @@ void interrupt( void )
 			if(!--led_3_timeout)
 				P_LED3 = 0;
 		}
+		if(sysex_timer) {
+			--sysex_timer;
+		}
 		intcon.2 = 0;		
 	}
 	
+	
 	////////////////////////////////////////////////
-	// SERIAL PORT RECEIVE INTERRUPT
-	// Fires when traffic arrives at the 
-	// primary MIDI port
-	if(pir1.5)
+	// SERIAL PORT TRANSMIT INTERRUPT
+	// TXIF bit is high whenever there is no serial
+	// transmit in progress. Low->High transition will
+	// trigger an interrupt, meaning characters of the 
+	// transmit buffer can be sent back to back
+	if(pir1.4) 
 	{	
-		// get the byte
-		byte b = rcreg;
-				
-		// check for realtime message 0xF8..0xFF
-		if((b&0xF8) == 0xF8) {
-			// place it in the transmit buffer 
-			// for transmission asap (tx buffer is
-			// only used for realtime messages so
-			// just assume it will never fill up!)
-			next_head = (tx_head + 1)&TXBUFFER_INDEX_MASK;			
-			if(next_head == tx_tail) {
-				SIGNAL_LED3(MIDI_OVERFLOW);
-			}
-			else {
-				tx_buffer[tx_head] = b;
-				tx_head = next_head;
-				SIGNAL_LED1(MIDI_INPUT_PULSE);
-			}
+		// more info in the receive fifo?
+		if(tx_head != tx_tail) {
+		
+			// send next character
+			txreg = tx_buffer[tx_tail];
+			++tx_tail;
+			tx_tail &= TXBUFFER_INDEX_MASK;
+			LED_2_SIGNAL(MIDI_OUTPUT_PULSE);
 		}
-		else 
-		{
-			// place the byte in the receive buffer
-			// for standard processing
-			next_head = (rx_head + 1)&RXBUFFER_INDEX_MASK;
-			if(next_head == rx_head) {
-				SIGNAL_LED3(MIDI_OVERFLOW);				
-			}
-			else {
-				rx_buffer[rx_head] = b;
-				rx_head = next_head;
-				SIGNAL_LED1(MIDI_INPUT_PULSE);
-			}			
-		}
-		pir1.5 = 0;
-	}		
+	}
+
 }
 
 ////////////////////////////////////////////////////////////
@@ -196,7 +240,7 @@ void init_usart()
 	txsta.2 = 0;	// BRGH		high baudrate 
 	txsta.0 = 0;	// TX9D		bit 9
 
-	rcsta.7 = 1;	// SPEN 	serial port enable
+	rcsta.7 = 0;	// SPEN 	serial port initiall disabled
 	rcsta.6 = 0;	// RX9 		8 bit operation
 	rcsta.5 = 1;	// SREN 	enable receiver
 	rcsta.4 = 1;	// CREN 	continuous receive enable
@@ -204,35 +248,6 @@ void init_usart()
 	spbrgh = 0;		// brg high byte
 	spbrg = 31;		// brg low byte (31250)	
 	
-}
-
-////////////////////////////////////////////////////////////
-//
-// FLUSH BUFFERED REALTIME MESSAGES
-//
-////////////////////////////////////////////////////////////
-void flush_tx_buffer() 
-{
-	while(tx_head != tx_tail) {
-		txreg = tx_buffer[tx_tail];
-		tx_tail = (tx_tail + 1)&TXBUFFER_INDEX_MASK;
-		SIGNAL_LED2(MIDI_OUTPUT_PULSE);	
-		while(!txsta.1);
-	}
-}
-
-////////////////////////////////////////////////////////////
-//
-// TRANSMIT A SINGLE MIDI BYTE
-//
-////////////////////////////////////////////////////////////
-void transmit(byte d) 
-{
-//	if(tx_head != tx_tail) 
-//		flush_tx_buffer();
-	txreg = d;
-	SIGNAL_LED2(MIDI_OUTPUT_PULSE);	
-	while(!txsta.1);	
 }
 
 ////////////////////////////////////////////////////////////
@@ -263,11 +278,12 @@ void init_i2c() {
 // SEND BYTE TO I2C BUS
 //
 ////////////////////////////////////////////////////////////
-void i2c_send(byte data) 
+byte i2c_send(byte data) 
 {
 	ssp1buf = data;
 	while((ssp1con2 & 0b00011111) || // SEN, RSEN, PEN, RCEN or ACKEN
 		(ssp1stat.2)); // data transmit in progress	
+	return !ssp1con2.6; // slave ack
 }
 
 ////////////////////////////////////////////////////////////
@@ -275,13 +291,25 @@ void i2c_send(byte data)
 // BEGIN I2C MASTER WRITE TRANSACTION
 //
 ////////////////////////////////////////////////////////////
-void i2c_begin_write(byte address) 
+byte i2c_begin_write(byte address) 
 {
 	pir1.3 = 0; // clear SSP1IF
 	ssp1con1.7 = 0; // clear WCOL
 	ssp1con2.0 = 1; // signal start condition
 	while(!pir1.3); // wait for it to complete
-	i2c_send(address<<1); // address + WRITE(0) bit
+	return i2c_send(address<<1); // address + WRITE(0) bit
+}
+
+////////////////////////////////////////////////////////////
+//
+// END AN I2C MASTER WRITE TRANSACTION
+//
+////////////////////////////////////////////////////////////
+void i2c_end_write() 
+{
+	pir1.3 = 0; // clear SSP1IF
+	ssp1con2.2 = 1; // signal stop condition
+	while(!pir1.3); // wait for it to complete
 }
 
 ////////////////////////////////////////////////////////////
@@ -304,7 +332,7 @@ byte i2c_begin_read(byte address)
 
 ////////////////////////////////////////////////////////////
 //
-// CONTINUE I2C MASTER READ TRANSACTION
+// CONTINUE I2C MASTER READ 
 //
 ////////////////////////////////////////////////////////////
 byte i2c_continue_read() 
@@ -319,7 +347,12 @@ byte i2c_continue_read()
 	return ssp1buf;
 }
 
-byte i2c_end_read() 
+////////////////////////////////////////////////////////////
+//
+// END I2C MASTER READ TRANSACTION
+//
+////////////////////////////////////////////////////////////
+void i2c_end_read() 
 {
 	pir1.3 = 0; // clear SSP1IF
 	ssp1con2.5 = 1; // set NAK state
@@ -333,14 +366,34 @@ byte i2c_end_read()
 
 ////////////////////////////////////////////////////////////
 //
-// END AN I2C MASTER TRANSACTION
+// SEND A COMMAND TO AN I2C SLAVE
 //
 ////////////////////////////////////////////////////////////
-void i2c_end() 
+byte slave_command(byte addr, byte cmd) 
 {
-	pir1.3 = 0; // clear SSP1IF
-	ssp1con2.2 = 1; // signal stop condition
-	while(!pir1.3); // wait for it to complete
+  byte result = i2c_begin_write(addr);
+  i2c_send(cmd);
+  i2c_end_write();
+  return result;
+}
+
+////////////////////////////////////////////////////////////
+//
+// QUEUE UP A BYTE FOR TRANSMISSION
+//
+////////////////////////////////////////////////////////////
+void transmit(byte d) {
+
+	// calculate next buffer head position
+	byte next_head = tx_head + 1;
+	next_head &= TXBUFFER_INDEX_MASK;
+	
+	// if the output buffer is full, we'll need to wait..
+	while(next_head == tx_tail);
+				
+	// add the byte to the output buffer
+	tx_buffer[tx_head] = d;
+	tx_head = next_head;	
 }
 
 ////////////////////////////////////////////////////////////
@@ -351,41 +404,106 @@ void i2c_end()
 // sent to the MIDI output
 //
 ////////////////////////////////////////////////////////////
-void handle_input_byte(byte d, INPUT_STATUS *pstatus)
-{
-	// Check if we have a command/status byte
-	if(d & 0x80)
+void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
+{	
+	// is this a MIDI command/status byte?
+	if(d & 0x80) 
 	{
+		// set up the new command 
+		pstatus->running_status = d;	
+		pstatus->param_index = 0;			
+		
+		// assume not system common for now...							
+		pstatus->is_system_common_msg = 0; 
+		
+		// handle command/status byte
 		switch(d & 0xF0)
 		{
 			case 0xF0:
-				// system wide and realtime are skipped... they
-				// are not valid to be passed into this function!
-				return;
+				switch(d) {
+					////////////////////////////////////////////
+					case 0xF0: // start of sysex
+						*in_sysex = 1;
+						pstatus->running_status = 0;
+						transmit(d);							
+						break;
+					case 0xF7: // end of sysex
+						*in_sysex = 0;
+						pstatus->running_status = 0;
+						transmit(d);							
+						break;
+					////////////////////////////////////////////
+					case 0xF1: // MTC quarter frame
+					case 0xF3: // song select
+						*in_sysex = 0;
+						pstatus->running_status = d;
+						pstatus->is_system_common_msg = 1;
+						pstatus->num_params = 1;
+						break;
+					////////////////////////////////////////////
+					case 0xF2: // Song position pointer
+						*in_sysex = 0;
+						pstatus->running_status = d;
+						pstatus->is_system_common_msg = 1;
+						pstatus->num_params = 2;
+						break;
+					////////////////////////////////////////////
+					case 0xF4: // reserved
+					case 0xF5: // reserved
+					case 0xF6: // tune request
+						// System common message without params will cancel running and sysex status
+						*in_sysex = 0;
+						pstatus->running_status = 0;
+						transmit(d);							
+						break;
+					////////////////////////////////////////////
+					case 0xF8: // MIDI clock tick
+					case 0xF9: // reserved
+					case 0xFA: // Start
+					case 0xFB: // Continue
+					case 0xFC: // Stop
+					case 0xFD: // Reserved
+					case 0xFE: // Active sensing
+					case 0xFF: // System reset
+						// Realtime message - does not cancel running or sysex status
+						transmit(d);							
+						break;
+				}
+				break;
 			case 0xA0: //  Aftertouch  1  key  touch  
 			case 0xC0: //  Patch change  1  instrument #   
 			case 0xD0: //  Channel Pressure  1  pressure  
-				pstatus->num_params = 1;
+				*in_sysex = 0; 					// cancel sysex status
+				pstatus->running_status = d; 	// sets running status
+				pstatus->num_params = 1;		// single param
+				pstatus->param_index = 0;										
 				break;    
 			case 0x80: //  Note-off  2  key  velocity  
 			case 0x90: //  Note-on  2  key  veolcity  
 			case 0xB0: //  Continuous controller  2  controller #  controller value  
 			case 0xE0: //  Pitch bend  2  lsb (7 bits)  msb (7 bits)  
 			default:
-				pstatus->num_params = 2;
+				*in_sysex = 0; 					// cancel sysex status
+				pstatus->running_status = d;	// sets running status
+				pstatus->num_params = 2;		// single param								
+				pstatus->param_index = 0;		
 				break;        
 		}
-		pstatus->running_status = d;
-		pstatus->param_index = 0;
 	}
-	else 
+	// 7-bit data during sysex transmission
+	else if(*in_sysex) 
+	{
+		transmit(d);
+		sysex_timer = SYSEX_TIMEOUT; 
+	}
+	// parameters for a MIDI message?
+	else if(pstatus->running_status)
 	{
 		// store the parameter
 		pstatus->param[pstatus->param_index++] = d;
 		
 		// do we have all the parameters for the message?
-		if(pstatus->running_status && 
-			(pstatus->param_index >= pstatus->num_params)) 
+		if(pstatus->param_index >= pstatus->num_params)
 		{
 			// Send the running status if changed
 			if(pstatus->running_status != out_running_status) {
@@ -402,161 +520,70 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus)
 			}
 			// ready to start again
 			pstatus->param_index = 0;
+			
+			// System common messages don not use a running status and 
+			// cancel any existing running status (but we try to make life 
+			// easier for ourselves by use common running status handling 
+			// to process them!)
+			if(pstatus->is_system_common_msg) {
+				pstatus->is_system_common_msg = 0;
+				pstatus->running_status = 0;
+			}
 		}
 	}
 }
 
+
 ////////////////////////////////////////////////////////////
 //
-// PROCESS MIDI DATA RECEIVED FROM 
+// RUN MASTER INPUT
 //
 ////////////////////////////////////////////////////////////
 void master_run()
 {
-	// is there more info received from serial?
-	while(rx_tail != rx_head)
-	{	
-		// read next byte from serial receive buffer
-		byte d = rx_buffer[rx_tail];
-		rx_tail = (rx_tail + 1)&RXBUFFER_INDEX_MASK;
-
-		// is this a system wide or realtime message?
-		if((d & 0xF0) == 0xF0)
-		{
-			// check when we are inside a sysex, since this
-			// will ensure the slaves are blocked to stop
-			// interlacing of data!
-			switch(d) 
-			{
-			case 0xF0: // Start of system exclusive
-				master_status.flags |= INSIDE_SYSEX;
-				break;
-			case 0xF7: // End of System Exclusive
-				master_status.flags &= ~INSIDE_SYSEX;
-				break;
+	byte in_sysex = 0;
+	do {
+		for(byte count = 0; count < SZ_DATACHUNK; ++count) {
+			if(rx_tail == rx_head) {
+				break; // input buffer is empty
 			}
-			
-			// single byte message without an effect on
-			// running status so transmit it directly
-			transmit(d);
+			handle_input_byte(rx_buffer[rx_tail], &master_status, &in_sysex);
+			++rx_tail;
+			rx_tail&=RXBUFFER_INDEX_MASK;
 		}
-		else if(master_status.flags & INSIDE_SYSEX) 
-		{
-			// send sysex byte
-			transmit(d);
-		}
-		else
-		{
-			// process the input, updating running
-			// status and the like...
-			handle_input_byte(d, &master_status);
-		}
-	}
-}	
-
-////////////////////////////////////////////////////////////
-//
-// SEND A COMMAND TO AN I2C SLAVE
-//
-////////////////////////////////////////////////////////////
-void slave_command(byte addr, byte cmd) 
-{
-  i2c_begin_write(addr);
-  i2c_send(cmd);
-  i2c_end();
+	} while(in_sysex && sysex_timer);
 }
 
 ////////////////////////////////////////////////////////////
 //
-// CHECK A SLAVE IS PRESENT 
-// We get the slave to send us the magic cookie "MSLVx" 
-// where x is A,B or C. This confirms the slave is alive
-//
-////////////////////////////////////////////////////////////
-byte slave_handshake(byte addr)
-{
-	// send identify command to the client
-	slave_command(addr, CMD_IDENTIFY);
-	
-	byte version = i2c_begin_read(addr);
-	byte result = 1;
-	if('M' != i2c_continue_read())
-		result = 0;
-	if('S' != i2c_continue_read())
-		result = 0;
-	if('L' != i2c_continue_read())
-		result = 0;
-	if('V' != i2c_continue_read())
-		result = 0;
-	byte name = i2c_continue_read();
-	i2c_end();	
-	
-	// make sure the slave buffer is cleared
-	slave_command(addr, CMD_CLEAR);
-	return result;	
-}
-
-////////////////////////////////////////////////////////////
-//
-// PULL IN DATA FROM A SLAVE
+// RUN SLAVE INPUT
 //
 ////////////////////////////////////////////////////////////
 void slave_run(byte addr, INPUT_STATUS *pstatus)
 {
-	byte i;
-	// get count of bytes remaining
-	byte count = i2c_begin_read(addr);	
+	byte in_sysex = 0;
+	do {
 	
-	// mask out slave overflow bit
-//	if(count & OVERFLOW_BIT) 
-//	{
-//		count &= ~OVERFLOW_BIT;
-//		SIGNAL_LED3(MIDI_OVERFLOW);
-//	}
-
-//	if(!count) 
-//		SIGNAL_LED3(MIDI_OVERFLOW);
-
-	// get all data from slave
-	byte buffer[64];
-	for(i=0; i<count; ++i)  
-		buffer[i] = i2c_continue_read();
-	i2c_end_read();	
-
-	for(i=0; i<count; ++i)  
-	{
-		byte d = buffer[i];
-
-		//transmit(d);
+		// get count of bytes remaining
+		byte count = i2c_begin_read(addr);				
+		if(count & 0x80) {
+			LED_3_SIGNAL(MIDI_INPUT_OVERFLOW);
+			count &= 0x7F;
+		}
 		
-		// No system common or real time messages 
-		// will be processed from a slave. This means
-		// we need to track when we are within a 
-		// system exclusive message
-		if((d & 0xF0) == 0xF0)
-		{
-			switch(d) 
-			{
-			case 0xF0: // Start of system exclusive
-				pstatus->flags |= INSIDE_SYSEX;
-				break;
-			case 0xF7: // End of System Exclusive
-				pstatus->flags &= ~INSIDE_SYSEX;
-				break;
+		// read the data over I2C
+		for(byte i=0; i<count; ++i) {
+			byte d = i2c_continue_read();
+			switch(d) {
+				case 0xF8: // CLOCK TICK is filtered out
+					break;
+				default:
+					handle_input_byte(d, pstatus, &in_sysex);
+					break;
 			}
 		}
-		// Other messages will be processed (as long
-		// as they are not part of a sysex)
-		else if(!(pstatus->flags & INSIDE_SYSEX))
-		{
-			handle_input_byte(d, pstatus);
-		}
-	}
-}	
-
-void init_status(INPUT_STATUS *pstatus)
-{
-	memset(pstatus,0,sizeof(pstatus));
+		i2c_end_read();	
+	} while (in_sysex && sysex_timer);
 }	
 
 ////////////////////////////////////////////////////////////
@@ -583,10 +610,6 @@ void main()
 	wpua.5 = 1; // weak pullup on switch RA5
 	option_reg.7 = 0;	// enable weak pull ups on port a
 
-	init_status(&master_status);
-	for(i=0; i<NUM_SLAVES; ++i) 
-		init_status(&slave_status[i]);
-
 	// initialise timer
 	init_timer();
 	
@@ -596,47 +619,74 @@ void main()
 	// initialise I2C master
 	init_i2c();
 
-	SIGNAL_LED1(INITIAL_PULSE);
-	SIGNAL_LED2(INITIAL_PULSE);
-	SIGNAL_LED3(INITIAL_PULSE);
+	for(;;) {
 	
-	// this delay makes sure all the slaves have time to initialise
-	delay_ms(100);
-
-	// enable interrupts	
-	intcon.7 = 1; //GIE
-	intcon.6 = 1; //PEIE
-
+		// disable interrupts	
+		intcon.7 = 0; //GIE
+		intcon.6 = 0; //PEIE
 	
-	while(1) 
-	{
-		// ensure receive buffer overrun 
-		// errors are cleared
-		if(rcsta.1)
-		{
-			rcsta.4 = 0;
-			rcsta.4 = 1;
+		// Initialise status
+		out_running_status = 0;
+		memset(&master_status,0,sizeof(INPUT_STATUS));
+		for(i=0; i<NUM_SLAVES; ++i) {
+			memset(&slave_status[i],0,sizeof(INPUT_STATUS));
 		}
-
-		// poll the master
-		//master_run();
-
-		// master sysex transmission blocks slaves
-		//if(!(master_status.flags & INSIDE_SYSEX)) 
-		{
-			// round-robin the slaves
-			for(i=0; i<NUM_SLAVES; ++i) 
-//			for(i=0; i<1; ++i) 
-			{			
-//				if(slave_status[i].flags & IS_ONLINE)
-					slave_run(SLAVE_I2C_ADDR|i, &slave_status[i]);
+		led_1_timeout = 0;
+		led_2_timeout = 0;
+		led_3_timeout = 0;
+	
+		// LED test pulses
+		P_LED1 = 1;
+		P_LED2 = 1;
+		P_LED3 = 1;
+		
+		// this delay makes sure all the slaves have time to initialise
+		delay_ms(100);
+	
+		P_LED1 = 0;
+		P_LED2 = 0;
+		P_LED3 = 0;
+	
+		// enable interrupts	
+		intcon.7 = 1; //GIE
+		intcon.6 = 1; //PEIE
+	
+		// Reset each of the slaves
+		for(i=0; i<NUM_SLAVES; ++i) {
+			if(slave_command(SLAVE_I2C_ADDR|i, CMD_START)) {
+				slave_status[i].enabled = 1;
 			}
 		}
-		// ensure any buffered realtime messages are flushed 
-		//flush_tx_buffer();
+	
+		// Enable local MIDI receive
+		rcsta.7 = 1;	
+	
+		// service the inputs in turn until the world ends
+		for(;;)
+		{
+			// unblock the serial input if there is an overflow
+			if(rcsta.1)	{
+				rcsta.4 = 0;
+				rcsta.4 = 1;
+			}
+			
+			// run the master
+			master_run();	
+			
+			// and each of the slaves in turn	
+			for(byte i=0; i < NUM_SLAVES; ++i) {
+				if(slave_status[i].enabled) {
+					slave_run(SLAVE_I2C_ADDR|i, &slave_status[i]);
+				}
+			}				
+			
+			// reset if switch is pressed
+			if(!P_SWITCH) 
+				break;
+		}
 	}
-
 }
 
-
-
+//
+// END
+//
