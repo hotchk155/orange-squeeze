@@ -424,18 +424,21 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
 					////////////////////////////////////////////
 					case 0xF0: // start of sysex
 						*in_sysex = 1;
+						out_running_status = 0;
 						pstatus->running_status = 0;
 						transmit(d);							
 						break;
 					case 0xF7: // end of sysex
 						*in_sysex = 0;
 						pstatus->running_status = 0;
+						out_running_status = 0;
 						transmit(d);							
 						break;
 					////////////////////////////////////////////
 					case 0xF1: // MTC quarter frame
 					case 0xF3: // song select
 						*in_sysex = 0;
+						out_running_status = 0;
 						pstatus->running_status = d;
 						pstatus->is_system_common_msg = 1;
 						pstatus->num_params = 1;
@@ -443,6 +446,7 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
 					////////////////////////////////////////////
 					case 0xF2: // Song position pointer
 						*in_sysex = 0;
+						out_running_status = 0;
 						pstatus->running_status = d;
 						pstatus->is_system_common_msg = 1;
 						pstatus->num_params = 2;
@@ -453,6 +457,7 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
 					case 0xF6: // tune request
 						// System common message without params will cancel running and sysex status
 						*in_sysex = 0;
+						out_running_status = 0;
 						pstatus->running_status = 0;
 						transmit(d);							
 						break;
@@ -528,6 +533,7 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
 			if(pstatus->is_system_common_msg) {
 				pstatus->is_system_common_msg = 0;
 				pstatus->running_status = 0;
+				out_running_status = 0;
 			}
 		}
 	}
@@ -681,8 +687,9 @@ void main()
 			}				
 			
 			// reset if switch is pressed
-			if(!P_SWITCH) 
-				break;
+while(!P_SWITCH);
+			//if(!P_SWITCH) 
+			//	break;
 		}
 	}
 }
