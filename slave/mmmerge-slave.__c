@@ -2,8 +2,8 @@
 Active Directory=D:\GitHub\mini-MIDI-merge\slave\
 Target=PIC12F1822
 Active Compiler=BoostC
-Active Config=Debug
-Config=1
+Active Config=Release
+Config=0
 Last Ext=h
 [Files]
 Count=2

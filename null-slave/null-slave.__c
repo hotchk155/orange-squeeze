@@ -1,5 +1,5 @@
 [Settings]
-Active Directory=D:\GitHub\mini-MIDI-merge\null-slave\
+Active Directory=D:\GitHub\mini-MIDI-merge\master\
 Target=PIC12LF1822
 Active Compiler=BoostC
 Active Config=Debug

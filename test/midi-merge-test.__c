@@ -3,6 +3,7 @@ Active Directory=D:\GitHub\mini-MIDI-merge\test\
 Target=PIC12LF1822
 Active Compiler=BoostC
 Active Config=Debug
+Config=1
 [Files]
 Count=1
 File0=midi-merge-test.c

@@ -1,19 +1,21 @@
 ////////////////////////////////////////////////////////////
 //
-//           ///    //// /////  /////   /////   ////
-//         //  // //        // //  // //   // //  //
-//        //  // //     ///// //  //  ////// //////
-//       //  // //    //  // //  //      // //
-//        ////  //     ///// //  //   /////  /////   
+//    ////   ////  ////  /////   /////   ////
+//   //  // //        // //  // //   // //  //
+//   //  // //     ///// //  //  ////// //////
+//   //  // //    //  // //  //      // //
+//    ////  //     ///// //  //  /////   /////   
 //
-//      ////  ///// //  //  ////   //// //////   //// 
-//    //    //  // //  // //  // //  //    //  //  //
-//    ////  ///// //  // ////// //////   //   //////
+//   ////  ///// //  //  ////   ////  //////  //// 
+//  //    //  // //  // //  // //  //    //  //  //
+//   ////  ///// //  // ////// //////   //   //////
 //      //    // //  // //     //      //    //
-//  ////     /// /////  /////  ////  //////  /////
+//  /////     /// /////  /////  ////  //////  /////
 //
-// 4:1 MIDI MERGE - MIDI TO I2C SLAVE MODULE
-// 2016/hotchk155         Sixty Four Pixels Limited
+// ORANGE SQUEEZE 4:1 MIDI MERGE
+// MIDI TO I2C SLAVE MODULE
+// 2016/hotchk155         
+// Sixty Four Pixels Limited
 // 
 // This code licensed under terms of creative commons BY-NC-SA
 // http://creativecommons.org/licenses/by-nc-sa/4.0/
@@ -273,16 +275,6 @@ void i2c_init(byte addr)
 	ssp1con1.2 = 1; // } I2C slave mode
 	ssp1con1.1 = 1; // } with 7 bit address
 	ssp1con1.0 = 0; // }
-	
-	//ssp1con2.SEN = 1; // enable clock stretching by slave
-	
-	//ssp1con3.6 = 0; // stop detection condition interrupt disabled
-	//ssp1con3.5 = 0; // start detection condition interrupt disabled
-	//ssp1con3.4 = 0; // ssp1buf only updated if ssp1ov is clear
-	//ssp1con3.3 = 0; // 100ns min hold time on SDA after falling SCL
-	//ssp1con3.2 = 0; // slave bus collision interrupt disabled
-	//ssp1con3.1 = 0; // address hold by slave disabled
-	//ssp1con3.0 = 0; // data hold by slave disabled
 	
 	ssp1msk = 0b01111111;	// address mask bits 0-6
 	ssp1add = addr<<1;	// set slave address

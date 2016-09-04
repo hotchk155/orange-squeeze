@@ -1,5 +1,5 @@
 #define NOTE_ON	0x91
-#define DELAY 100
+#define DELAY 2
 
 //
 // HEADER FILES
@@ -115,6 +115,7 @@ void main()
 	porta=0;
 	// initialise MIDI comms
 	initUSART();
+	delay_ms(200);
 /*
 
 	// Configure timer 0 (controls systemticks)

@@ -1,19 +1,21 @@
 ////////////////////////////////////////////////////////////
 //
-//           ///    //// /////  /////   /////   ////
-//         //  // //        // //  // //   // //  //
-//        //  // //     ///// //  //  ////// //////
-//       //  // //    //  // //  //      // //
-//        ////  //     ///// //  //   /////  /////   
+//    ////   ////  ////  /////   /////   ////
+//   //  // //        // //  // //   // //  //
+//   //  // //     ///// //  //  ////// //////
+//   //  // //    //  // //  //      // //
+//    ////  //     ///// //  //  /////   /////   
 //
-//      ////  ///// //  //  ////   //// //////   //// 
-//    //    //  // //  // //  // //  //    //  //  //
-//    ////  ///// //  // ////// //////   //   //////
+//   ////  ///// //  //  ////   ////  //////  //// 
+//  //    //  // //  // //  // //  //    //  //  //
+//   ////  ///// //  // ////// //////   //   //////
 //      //    // //  // //     //      //    //
-//  ////     /// /////  /////  ////  //////  /////
+//  /////     /// /////  /////  ////  //////  /////
 //
-// 4:1 MIDI MERGE - MIDI TO I2C MASTER MODULE
-// 2016/hotchk155         Sixty Four Pixels Limited
+// ORANGE SQUEEZE 4:1 MIDI MERGE
+// MASTER MODULE
+// 2016/hotchk155         
+// Sixty Four Pixels Limited
 // 
 // This code licensed under terms of creative commons BY-NC-SA
 // http://creativecommons.org/licenses/by-nc-sa/4.0/
@@ -22,9 +24,8 @@
 //
 // History
 // Ver  Date 		Desc	
-// 1    18/6/16		Initial version
+// 0.1  July16		Initial test version
 //
-#define FIRMWARE_VERSION 	1
 ////////////////////////////////////////////////////////////
 
 //
@@ -59,19 +60,24 @@
 #define TRIS_A	0b00100000
 #define TRIS_C	0b00110000
 
-#define SLAVE_I2C_ADDR 		0x70	// slave address #0
+// Timer 0 is an 8 bit timer counting at 250kHz
+#define TIMER_0_INIT_SCALAR		5	
 
+// Number of slave inputs
+#define NUM_SLAVES 3
 
-#define TIMER_0_INIT_SCALAR		5	// Timer 0 is an 8 bit timer counting at 250kHz
+// Timeout (ms) to prevent an unfinished sysex from blocking system
+#define SYSEX_TIMEOUT 1000	
 
-#define SYSEX_TIMEOUT 1000	// Timeout (ms) to prevent an unfinished sysex from blocking system
-
+// master input MIDI receive buffer size
 #define SZ_RXBUFFER 64
 #define RXBUFFER_INDEX_MASK 0x3F
 
-#define SZ_TXBUFFER 64
-#define TXBUFFER_INDEX_MASK 0x3F
+// combined output MIDI buffer size
+#define SZ_TXBUFFER 128
+#define TXBUFFER_INDEX_MASK 0x7F
 
+// Timings of LED blinks
 #define INITIAL_PULSE				200
 #define MIDI_INPUT_PULSE			1
 #define MIDI_INPUT_OVERFLOW			200
@@ -82,16 +88,12 @@
 #define LED_2_SIGNAL(t) { P_LED2 = 1; if(t>led_2_timeout) led_2_timeout = t; }
 #define LED_3_SIGNAL(t) { P_LED3 = 1; if(t>led_3_timeout) led_3_timeout = t; }
 
-
-#define SZ_DATACHUNK 64			// How many bytes to process on each pass 
-
-#define NUM_SLAVES 3
-
 //
 // TYPE DEFINITIONS
 //
 typedef unsigned char byte;
 
+// This is the 
 typedef struct 
 {
 	byte enabled;				// TRUE if this slave exists
@@ -105,16 +107,33 @@ typedef struct
 //
 // GLOBAL DATA
 //
+
+// master input receive buffer
 volatile byte rx_buffer[SZ_RXBUFFER];
 volatile byte rx_head = 0;
 volatile byte rx_tail = 0;
+
+// merged output transmit buffer
 volatile byte tx_buffer[SZ_TXBUFFER];
 volatile byte tx_head = 0;
 volatile byte tx_tail = 0;
-volatile int sysex_timer = 0;
-volatile INPUT_STATUS slave_status[NUM_SLAVES];
+
+// master input, realtime message buffer (can only hold 2 messages)
+volatile byte realtime_msg[2];
+
+// master input status
 volatile INPUT_STATUS master_status;
+
+// slave input statuses
+volatile INPUT_STATUS slave_status[NUM_SLAVES];
+
+// MIDI running status on the merged output
 volatile byte out_running_status;
+
+// timeout counter for aborted systex
+volatile int sysex_timer;
+
+// timeouts for LED pulses
 volatile int led_1_timeout;
 volatile int led_2_timeout;
 volatile int led_3_timeout;
@@ -138,18 +157,34 @@ void interrupt( void )
 		byte b = rcreg;		
 		pir1.5 = 0;
 		
-		next = rx_head + 1;
-		next &= RXBUFFER_INDEX_MASK;
-		if(next == rx_tail) {
-			// full receive buffer! data will be dropped
-			LED_1_SIGNAL(MIDI_INPUT_OVERFLOW);
-			LED_3_SIGNAL(MIDI_INPUT_OVERFLOW);
+		// is this a MIDI realtime message 0xF8..0xFF?
+		// ...and if there space in the special realtime 
+		// msg buffer
+		if(((b & 0xF8) == 0xF8) && !realtime_msg[1]) 
+		{
+			if(realtime_msg[0]) {
+				realtime_msg[1] = b;
+			}
+			else {
+				realtime_msg[0] = b;
+			}
+			LED_1_SIGNAL(MIDI_INPUT_PULSE);
 		}
 		else {
-			rx_buffer[rx_head] = b;
-			rx_head = next;
-			LED_1_SIGNAL(MIDI_INPUT_PULSE);
-		}			
+			// other messages will be buffered
+			next = rx_head + 1;
+			next &= RXBUFFER_INDEX_MASK;
+			if(next == rx_tail) {
+				// full receive buffer! data will be dropped
+				LED_1_SIGNAL(MIDI_INPUT_OVERFLOW);
+				LED_3_SIGNAL(MIDI_INPUT_OVERFLOW);
+			}
+			else {
+				rx_buffer[rx_head] = b;
+				rx_head = next;
+				LED_1_SIGNAL(MIDI_INPUT_PULSE);
+			}			
+		}
 	}		
 	
 	////////////////////////////////////////////////
@@ -158,7 +193,11 @@ void interrupt( void )
 	// the various LEDs are on for 
 	if(intcon.2)
 	{
+		// reset timer to overflow again in 1 ms
 		tmr0 = TIMER_0_INIT_SCALAR;
+		intcon.2 = 0;		
+		
+		// manage the three LED timeouts
 		if(led_1_timeout) {
 			if(!--led_1_timeout)
 				P_LED1 = 0;
@@ -171,10 +210,11 @@ void interrupt( void )
 			if(!--led_3_timeout)
 				P_LED3 = 0;
 		}
+		
+		// manage sysex timeout
 		if(sysex_timer) {
 			--sysex_timer;
 		}
-		intcon.2 = 0;		
 	}
 	
 	
@@ -186,9 +226,21 @@ void interrupt( void )
 	// transmit buffer can be sent back to back
 	if(pir1.4) 
 	{	
-		// more info in the receive fifo?
-		if(tx_head != tx_tail) {
-		
+		// two pending realtime messages?
+		if(realtime_msg[1]) {
+			// send first and move second message along
+			txreg = realtime_msg[0];
+			realtime_msg[0] = realtime_msg[1];
+			realtime_msg[1] = 0;
+		}
+		// one pending realtime message
+		else if(realtime_msg[0]) {
+			// send if
+			txreg = realtime_msg[0];
+			realtime_msg[0] = 0;			
+		}
+		// any pending data in transmit buffer
+		else if(tx_head != tx_tail) {		
 			// send next character
 			txreg = tx_buffer[tx_tail];
 			++tx_tail;
@@ -196,7 +248,6 @@ void interrupt( void )
 			LED_2_SIGNAL(MIDI_OUTPUT_PULSE);
 		}
 	}
-
 }
 
 ////////////////////////////////////////////////////////////
@@ -526,7 +577,7 @@ void handle_input_byte(byte d, INPUT_STATUS *pstatus, byte *in_sysex)
 			// ready to start again
 			pstatus->param_index = 0;
 			
-			// System common messages don not use a running status and 
+			// System common messages do not use a running status and 
 			// cancel any existing running status (but we try to make life 
 			// easier for ourselves by use common running status handling 
 			// to process them!)
@@ -549,7 +600,8 @@ void master_run()
 {
 	byte in_sysex = 0;
 	do {
-		for(byte count = 0; count < SZ_DATACHUNK; ++count) {
+		// copy over up to 64 bytes
+		for(byte count = 0; count < SZ_RXBUFFER; ++count) {
 			if(rx_tail == rx_head) {
 				break; // input buffer is empty
 			}
@@ -640,6 +692,8 @@ void main()
 		led_1_timeout = 0;
 		led_2_timeout = 0;
 		led_3_timeout = 0;
+		realtime_msg[0] = 0;
+		realtime_msg[1] = 0;
 	
 		// LED test pulses
 		P_LED1 = 1;
@@ -659,7 +713,7 @@ void main()
 	
 		// Reset each of the slaves
 		for(i=0; i<NUM_SLAVES; ++i) {
-			if(slave_command(SLAVE_I2C_ADDR|i, CMD_START)) {
+			if(slave_command(I2C_ADDR|i, CMD_START)) {
 				slave_status[i].enabled = 1;
 			}
 		}
@@ -682,14 +736,13 @@ void main()
 			// and each of the slaves in turn	
 			for(byte i=0; i < NUM_SLAVES; ++i) {
 				if(slave_status[i].enabled) {
-					slave_run(SLAVE_I2C_ADDR|i, &slave_status[i]);
+					slave_run(I2C_ADDR|i, &slave_status[i]);
 				}
 			}				
 			
 			// reset if switch is pressed
-while(!P_SWITCH);
-			//if(!P_SWITCH) 
-			//	break;
+			if(!P_SWITCH) 
+				break;
 		}
 	}
 }
