@@ -4,7 +4,7 @@ Target=PIC16LF1825
 Active Compiler=BoostC
 Active Config=Release
 Last Ext=h
-Config=1
+Config=0
 [Files]
 Count=2
 File0=mmmerge-master.c

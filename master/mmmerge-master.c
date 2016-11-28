@@ -695,28 +695,27 @@ void main()
 		realtime_msg[0] = 0;
 		realtime_msg[1] = 0;
 	
-		// LED test pulses
-		P_LED1 = 1;
-		P_LED2 = 1;
-		P_LED3 = 1;
-		
-		// this delay makes sure all the slaves have time to initialise
-		delay_ms(100);
-	
-		P_LED1 = 0;
-		P_LED2 = 0;
-		P_LED3 = 0;
-	
 		// enable interrupts	
 		intcon.7 = 1; //GIE
 		intcon.6 = 1; //PEIE
 	
 		// Reset each of the slaves
 		for(i=0; i<NUM_SLAVES; ++i) {
+			delay_ms(100);
 			if(slave_command(I2C_ADDR|i, CMD_START)) {
 				slave_status[i].enabled = 1;
 			}
 		}
+		
+		// LED test pulses
+		P_LED1 = 1;
+		P_LED2 = 1;
+		P_LED3 = 1;
+		delay_ms(200);	
+		P_LED1 = 0;
+		P_LED2 = 0;
+		P_LED3 = 0;
+	
 	
 		// Enable local MIDI receive
 		rcsta.7 = 1;	
