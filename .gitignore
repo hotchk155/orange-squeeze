@@ -68,3 +68,18 @@ makefile.*
 *.exe
 */Release/*.*
 */Debug/*.*
+
+## VC++
+*.tlog
+*.db
+*.log
+*.idb
+*.pdb
+*.ipdb
+*.iobj
+*.obj
+*.ilk
+*.suo
+*.pch
+*.ipch
+*.filters

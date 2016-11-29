@@ -1,9 +1,9 @@
 [Settings]
-Active Directory=D:\GitHub\mini-MIDI-merge\test\
+Active Directory=D:\GitHub\mini-MIDI-merge\test\sender\
 Target=PIC12LF1822
 Active Compiler=BoostC
-Active Config=Debug
-Config=1
+Active Config=Release
+Config=0
 [Files]
 Count=1
 File0=midi-merge-test.c

@@ -1,5 +1,5 @@
-#define NOTE_ON	0x91
-#define DELAY 2
+#define NOTE_ON	0x93
+#define DELAY 50
 
 //
 // HEADER FILES
