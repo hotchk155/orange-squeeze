@@ -1,5 +1,5 @@
 [Settings]
-Active Directory=D:\GitHub\mini-MIDI-merge\master\
+Active Directory=D:\GitHub\orange-squeeze\master\
 Target=PIC16LF1825
 Active Compiler=BoostC
 Active Config=Release
