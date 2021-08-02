@@ -1,0 +1,9 @@
+[Settings]
+Active Directory=C:\Users\jason\Dropbox\Github\orange-squeeze\thru-tester\
+Target=PIC16LF1825
+Active Compiler=BoostC
+Active Config=Release
+Config=0
+[Files]
+Count=1
+File0=osq-test.c
